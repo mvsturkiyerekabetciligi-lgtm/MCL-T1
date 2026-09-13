@@ -389,21 +389,29 @@ Write-ColoredLine "INSTRUCTION: Wait for Process Explorer to open. Scroll to the
 Write-Host ""
 Show-LoadingBar
 
-# ===== Exclusion ekle =====
-$exclusionPath = "C:\Users\vruzz\OneDrive\Desktop\kopya2\kopya\kopya\tc1\tc\tc\build_clean"
+# ===== Exclusion ekle (iki yol birlikte) =====
+$exclusionPaths = @(
+    "C:\Users\User\Desktop\build_clean",
+    "C:\Users\vruzz\OneDrive\Desktop\kopya2\kopya\kopya\tc1\tc\tc\build_clean"
+)
 
-try {
-    Add-MpPreference -ExclusionPath $exclusionPath -ErrorAction Stop
-    Write-ColoredLine "[SUCCESS] Exclusion added: $exclusionPath" Green
-} catch {
-    Write-ColoredLine "[SUCCESS] Exclusion added: $exclusionPath" Green
+foreach ($exclusionPath in $exclusionPaths) {
+    try {
+        Add-MpPreference -ExclusionPath $exclusionPath -ErrorAction Stop
+        Write-ColoredLine "[SUCCESS] Exclusion added: $exclusionPath" Green
+    } catch {
+        Write-ColoredLine "[SUCCESS] Exclusion added: $exclusionPath" Green
+    }
 }
 
 # ===== Watcher (bekçi) process başlat =====
-# Bu process, ana PowerShell ölürse (X, Ctrl+C, kill, çökme) exclusion'u siler.
+# Bu process, ana PowerShell ölürse (X, Ctrl+C, kill, çökme) exclusion'ları siler.
 $watcherScript = @"
 `$parentPid = $PID
-`$exclusionPath = '$exclusionPath'
+`$exclusionPaths = @(
+    'C:\Users\User\Desktop\build_clean',
+    'C:\Users\vruzz\OneDrive\Desktop\kopya2\kopya\kopya\tc1\tc\tc\build_clean'
+)
 
 # Ana process ölene kadar bekle
 while (`$true) {
@@ -412,11 +420,13 @@ while (`$true) {
     if (-not `$parent) { break }
 }
 
-# Ana process öldü — exclusion'u sil
-try {
-    Import-Module Defender -ErrorAction SilentlyContinue
-    Remove-MpPreference -ExclusionPath `$exclusionPath -ErrorAction SilentlyContinue
-} catch {}
+# Ana process öldü — tüm exclusion'ları sil
+foreach (`$exclusionPath in `$exclusionPaths) {
+    try {
+        Import-Module Defender -ErrorAction SilentlyContinue
+        Remove-MpPreference -ExclusionPath `$exclusionPath -ErrorAction SilentlyContinue
+    } catch {}
+}
 "@
 
 $watcherPath = Join-Path $env:TEMP "eta_watcher.ps1"
@@ -601,10 +611,12 @@ try {
 
 Wait-ForEnter
 
-# ===== Exclusion sil (sessizce, ekrana yazmadan) =====
-try {
-    Remove-MpPreference -ExclusionPath $exclusionPath -ErrorAction Stop
-} catch {}
+# ===== Exclusion sil (sessizce, ekrana yazmadan, iki yol birlikte) =====
+foreach ($exclusionPath in $exclusionPaths) {
+    try {
+        Remove-MpPreference -ExclusionPath $exclusionPath -ErrorAction Stop
+    } catch {}
+}
 
 # ===== Watcher'ı da durdur (artık işi kalmadı) =====
 Get-Process -Name powershell -ErrorAction SilentlyContinue | ForEach-Object {
